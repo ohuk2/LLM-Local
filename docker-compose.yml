@@ -35,6 +35,11 @@ services:
       - WEBUI_AUTH=true                 # requires login; set to false only for single-user test rigs
       - ENABLE_SIGNUP=false              # admin creates accounts; no open self-registration on customer sites
       - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:?set this in .env}
+      # Air-gapped network: prevent startup from hanging on calls that need internet.
+      - HF_HUB_OFFLINE=1                 # skip downloading the RAG embedding model from Hugging Face
+      - ANONYMIZED_TELEMETRY=false
+      - DO_NOT_TRACK=1
+      - SCARF_NO_ANALYTICS=true
     volumes:
       - openwebui-data:/app/backend/data
     networks:

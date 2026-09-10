@@ -1,0 +1,18 @@
+# Secrets — never commit real values, only .env.example
+.env
+*.tfvars
+!*.tfvars.example
+
+# Terraform state and working files — contains resource IDs, sometimes secrets.
+# Use a remote backend (S3 + DynamoDB lock) instead of committing local state.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store

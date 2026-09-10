@@ -16,6 +16,13 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# S3 gateway endpoint traffic is routed internally but still targets S3's
+# public IP ranges from the security group's point of view — a plain
+# vpc_cidr egress rule does not cover it. This prefix list does.
+data "aws_prefix_list" "s3" {
+  name = "com.amazonaws.${var.region}.s3"
+}
+
 # ---------------------------------------------------------------------------
 # Network — private subnet only, no internet gateway, no NAT gateway.
 # All AWS API traffic (S3, ECR, SSM, logs) goes over VPC endpoints instead.
@@ -85,11 +92,19 @@ resource "aws_security_group" "llm_host" {
   }
 
   egress {
-    description = "Restricted to VPC endpoints and internal traffic — no route to the internet exists anyway"
+    description = "Restricted to VPC endpoints and internal traffic (no route to the internet exists anyway)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description     = "S3 gateway endpoint (targets AWS public S3 ranges even though traffic stays on the VPC route table)"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_prefix_list.s3.id]
   }
 }
 
@@ -125,10 +140,13 @@ resource "aws_s3_bucket_policy" "model_bundle" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid       = "RestrictToVpcEndpoint"
+      Sid       = "RestrictReadsToVpcEndpoint"
       Effect    = "Deny"
       Principal = "*"
-      Action    = "s3:*"
+      # Scoped to object-read actions only — never s3:* — so this can't
+      # accidentally block bucket-policy management (Get/Put/DeleteBucketPolicy),
+      # which would lock everyone but the account root user out of fixing it.
+      Action = ["s3:GetObject", "s3:ListBucket"]
       Resource = [
         "arn:aws:s3:::${var.model_bundle_bucket}",
         "arn:aws:s3:::${var.model_bundle_bucket}/*",
