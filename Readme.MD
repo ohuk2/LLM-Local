@@ -170,7 +170,6 @@ Removes the VPC, endpoints, IAM role, and instance. The S3 bucket and its conten
 
 | Symptom | Cause | Fix |
 |---|---|---|
-|
 | `aws s3 cp` (and anything else through the S3 **gateway** endpoint) hangs indefinitely, `timeout` returns exit code 124 | The security group's egress rule only allowed traffic to the VPC CIDR. S3 gateway endpoint traffic is routed internally but still targets S3's *public* IP ranges from the security group's perspective, so it was silently dropped | Add a second egress rule scoped to the AWS-managed S3 prefix list (`data "aws_prefix_list" "s3"`, `com.amazonaws.<region>.s3`) allowing port 443 |
 | `docker compose up -d` fails: `failed to resolve reference "docker.io/..."`, `dial tcp ... i/o timeout` | No internet route — Compose was trying to pull images from Docker Hub / GHCR | Stage images as `docker save` tarballs via S3 (see step 2) and `docker load` them before `docker compose up -d` |
 | `open-webui` container stays `unhealthy` for several minutes, `curl` to Caddy returns `502` | Open WebUI hangs on startup trying to download its RAG embedding model from Hugging Face and/or phone home for telemetry — no internet route to reach either | Add `HF_HUB_OFFLINE=1`, `ANONYMIZED_TELEMETRY=false`, `DO_NOT_TRACK=1`, `SCARF_NO_ANALYTICS=true` to the `open-webui` service's environment in `docker-compose.yml`. Note: this disables RAG/document-upload until the embedding model is staged separately |
