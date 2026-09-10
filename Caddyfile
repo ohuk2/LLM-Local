@@ -1,0 +1,23 @@
+# Replace with the internal DNS name or IP the site uses to reach this host,
+# e.g. llm.internal.customer-site.local or the instance's private IP.
+{$SITE_HOSTNAME:localhost} {
+	# No internet access means no public ACME cert issuance.
+	# Use an internally-issued cert (from the customer's own CA / internal PKI)
+	# or fall back to Caddy's local CA (self-signed, trust the root on client machines):
+	tls internal
+
+	reverse_proxy open-webui:8080
+
+	encode gzip
+
+	log {
+		output file /data/access.log
+		format json
+	}
+}
+
+# Plain-HTTP fallback for environments where clients can't trust an internal cert yet.
+# Remove this block once TLS is fully rolled out to end-user machines.
+:80 {
+	redir https://{host}{uri} permanent
+}

@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=4       # concurrent generation streams per model
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_KEEP_ALIVE=30m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - internal
+    # No published ports — only reachable inside the compose network.
+    # Open WebUI and Caddy talk to it over the internal network by service name.
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=true                 # requires login; set to false only for single-user test rigs
+      - ENABLE_SIGNUP=false              # admin creates accounts; no open self-registration on customer sites
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:?set this in .env}
+    volumes:
+      - openwebui-data:/app/backend/data
+    networks:
+      - internal
+    # No published ports — Caddy is the only entry point.
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+    ports:
+      - "443:443"
+      - "80:80"   # used only for ACME/self-signed redirect; safe to drop entirely in a fully offline site
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  openwebui-data:
+  caddy-data:
+  caddy-config:
